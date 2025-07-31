@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voice Recorder</title>
+  <script src="https://cdn.jsdelivr.net/npm/mic-recorder-to-mp3@2.2.0/dist/index.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 40px; text-align: center; }
+    button { margin: 10px; padding: 10px 20px; font-size: 18px; }
+    audio { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>🎙️ Record Your Voice</h2>
+  <button id="start">Start Recording</button>
+  <button id="stop" disabled>Stop & Save</button>
+  <audio id="player" controls></audio>
+  <p id="status"></p>
+
+  <script>
+    const recorder = new MicRecorder({ bitRate: 128 });
+    const startBtn = document.getElementById('start');
+    const stopBtn = document.getElementById('stop');
+    const audioPlayer = document.getElementById('player');
+    const statusText = document.getElementById('status');
+
+    startBtn.onclick = () => {
+      recorder.start().then(() => {
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        statusText.innerText = 'Recording...';
+      }).catch(console.error);
+    };
+
+    stopBtn.onclick = () => {
+      recorder.stop().getMp3().then(([buffer, blob]) => {
+        const file = new File(buffer, 'voice.mp3', { type: blob.type });
+        const url = URL.createObjectURL(file);
+        audioPlayer.src = url;
+        statusText.innerText = 'Recording complete. You can now play or download.';
+
+        // 🚀 OPTIONAL: Send to webhook
+        // const formData = new FormData();
+        // formData.append('audio', file);
+        // fetch('https://your-make-webhook-url', {
+        //   method: 'POST',
+        //   body: formData,
+        // });
+
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      }).catch(console.error);
+    };
+  </script>
+</body>
+</html>
