@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Voice Recorder to S3</title>
+  <title>Voice Recorder to S3 + Make</title>
   <script src="https://cdn.jsdelivr.net/npm/mic-recorder-to-mp3@2.2.0/dist/index.min.js"></script>
   <style>
     body {
@@ -29,7 +29,7 @@
   </style>
 </head>
 <body>
-  <h2>🎙️ Record & Upload to S3</h2>
+  <h2>🎙️ Record & Upload</h2>
   <button id="start">Start Recording</button>
   <button id="stop" disabled>Stop & Upload</button>
   <audio id="player" controls></audio>
@@ -43,8 +43,6 @@
     const audioPlayer = document.getElementById('player');
     const statusText = document.getElementById('status');
     const urlOutput = document.getElementById('urlOutput');
-
-    let audioFile = null;
 
     startBtn.onclick = () => {
       recorder.start().then(() => {
@@ -63,7 +61,7 @@
         const region = "ap-southeast-2";
         const uploadUrl = `https://${s3Bucket}.s3.${region}.amazonaws.com/${fileName}`;
 
-        audioFile = new File(buffer, fileName, { type: blob.type });
+        const audioFile = new File(buffer, fileName, { type: blob.type });
         const url = URL.createObjectURL(audioFile);
         audioPlayer.src = url;
 
@@ -81,6 +79,25 @@
           statusText.innerText = '✅ Uploaded!';
           urlOutput.innerHTML = `File URL: <a href="${publicUrl}" target="_blank">${publicUrl}</a>`;
           console.log('✅ S3 Upload URL:', publicUrl);
+
+          // 🔁 Send to Make webhook
+          fetch("https://hook.eu2.make.com/svoue3j76cre2lbk5uvfd0kmme58a37f", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              file_url: publicUrl,
+              source: "adalo-s3"
+            })
+          })
+          .then(() => {
+            console.log('✅ Webhook sent to Make');
+          })
+          .catch((err) => {
+            console.error('⚠️ Failed to send webhook:', err);
+          });
+
         })
         .catch((err) => {
           console.error('Upload error:', err);
