@@ -2,10 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Voice Recorder to AI</title>
+  <title>Voice Recorder to S3</title>
   <script src="https://cdn.jsdelivr.net/npm/mic-recorder-to-mp3@2.2.0/dist/index.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -31,27 +29,14 @@
   </style>
 </head>
 <body>
-  <h2>🎙️ Record & Send to AI</h2>
+  <h2>🎙️ Record & Upload to S3</h2>
   <button id="start">Start Recording</button>
-  <button id="stop" disabled>Stop & Send</button>
+  <button id="stop" disabled>Stop & Upload</button>
   <audio id="player" controls></audio>
   <p id="status">Ready to record.</p>
   <p id="urlOutput"></p>
 
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyC1_VM6Vg3Yz06p-tqp01OigouTPSkn_KI",
-      authDomain: "learnable-mvp.firebaseapp.com",
-      projectId: "learnable-mvp",
-      storageBucket: "learnable-mvp.appspot.com",
-      messagingSenderId: "194256808339",
-      appId: "1:194256808339:web:be7b102515174d5f012066",
-      measurementId: "G-QV99HLVXR4"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const storage = firebase.storage();
-
     const recorder = new MicRecorder({ bitRate: 128 });
     const startBtn = document.getElementById('start');
     const stopBtn = document.getElementById('stop');
@@ -72,41 +57,33 @@
 
     stopBtn.onclick = () => {
       recorder.stop().getMp3().then(([buffer, blob]) => {
-        audioFile = new File(buffer, 'voice.mp3', { type: blob.type });
-        const localUrl = URL.createObjectURL(audioFile);
-        audioPlayer.src = localUrl;
+        const randomId = Math.random().toString(36).substring(2, 15);
+        const fileName = `audio-${randomId}.mp3`;
+        const s3Bucket = "learnable-audio-responses";
+        const region = "ap-southeast-2";
+        const uploadUrl = `https://${s3Bucket}.s3.${region}.amazonaws.com/${fileName}`;
 
-        const timestamp = Date.now();
-        const filePath = `recordings/voice-${timestamp}.mp3`;
-        const ref = storage.ref().child(filePath);
+        audioFile = new File(buffer, fileName, { type: blob.type });
+        const url = URL.createObjectURL(audioFile);
+        audioPlayer.src = url;
 
-        statusText.innerText = '⬆️ Uploading to Firebase...';
+        statusText.innerText = '⬆️ Uploading to S3...';
 
-        ref.put(audioFile).then(snapshot => {
-          return snapshot.ref.getDownloadURL();
-        }).then(downloadURL => {
-          statusText.innerText = '✅ Uploaded! Sending to AI...';
-          urlOutput.innerHTML = `File URL: <a href="${downloadURL}" target="_blank">${downloadURL}</a>`;
-
-          // 🔁 Send to Make webhook
-          fetch("https://hook.eu2.make.com/svoue3j76cre2lbk5uvfd0kmme58a37f", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              file_url: downloadURL,
-              source: "flutterflow-webview"
-            })
-          }).then(() => {
-            statusText.innerText = '🚀 Sent to AI pipeline!';
-          }).catch(err => {
-            console.error('Webhook error:', err);
-            statusText.innerText = '⚠️ Failed to send to AI.';
-          });
-
-        }).catch(error => {
-          console.error('Upload error:', error);
+        fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': blob.type
+          },
+          body: audioFile
+        })
+        .then(() => {
+          const publicUrl = `https://${s3Bucket}.s3.${region}.amazonaws.com/${fileName}`;
+          statusText.innerText = '✅ Uploaded!';
+          urlOutput.innerHTML = `File URL: <a href="${publicUrl}" target="_blank">${publicUrl}</a>`;
+          console.log('✅ S3 Upload URL:', publicUrl);
+        })
+        .catch((err) => {
+          console.error('Upload error:', err);
           statusText.innerText = '❌ Upload failed.';
         });
 
