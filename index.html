@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Voice Recorder</title>
+  <title>Voice Recorder to Firebase</title>
   <script src="https://cdn.jsdelivr.net/npm/mic-recorder-to-mp3@2.2.0/dist/index.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -21,23 +23,41 @@
     #status {
       margin-top: 20px;
       font-weight: bold;
-      color: #444;
+    }
+    #urlOutput {
+      word-break: break-all;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
-  <h2>🎙️ Record Your Voice</h2>
+  <h2>🎙️ Record & Upload to Firebase</h2>
   <button id="start">Start Recording</button>
-  <button id="stop" disabled>Stop & Send</button>
+  <button id="stop" disabled>Stop & Upload</button>
   <audio id="player" controls></audio>
-  <p id="status">Tap start to begin</p>
+  <p id="status">Ready to record.</p>
+  <p id="urlOutput"></p>
 
   <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC1_VM6Vg3Yz06p-tqp01OigouTPSkn_KI",
+      authDomain: "learnable-mvp.firebaseapp.com",
+      projectId: "learnable-mvp",
+      storageBucket: "learnable-mvp.appspot.com",
+      messagingSenderId: "194256808339",
+      appId: "1:194256808339:web:be7b102515174d5f012066",
+      measurementId: "G-QV99HLVXR4"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const storage = firebase.storage();
+
     const recorder = new MicRecorder({ bitRate: 128 });
     const startBtn = document.getElementById('start');
     const stopBtn = document.getElementById('stop');
     const audioPlayer = document.getElementById('player');
     const statusText = document.getElementById('status');
+    const urlOutput = document.getElementById('urlOutput');
 
     let audioFile = null;
 
@@ -46,6 +66,7 @@
         startBtn.disabled = true;
         stopBtn.disabled = false;
         statusText.innerText = '🎤 Recording...';
+        urlOutput.innerText = '';
       }).catch(console.error);
     };
 
@@ -54,26 +75,26 @@
         audioFile = new File(buffer, 'voice.mp3', { type: blob.type });
         const url = URL.createObjectURL(audioFile);
         audioPlayer.src = url;
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        statusText.innerText = 'Uploading audio...';
 
-        // ✅ Send to Make webhook
-        const formData = new FormData();
-        formData.append('audio', audioFile);
+        const timestamp = Date.now();
+        const filePath = `recordings/voice-${timestamp}.mp3`;
+        const ref = storage.ref().child(filePath);
 
-        fetch('https://hook.eu2.make.com/svoue3j76cre2lbk5uvfd0kmme58a37f', {
-          method: 'POST',
-          body: formData,
-        })
-        .then(() => {
-          statusText.innerText = '✅ Audio sent to AI. You’ll receive a reply soon.';
-        })
-        .catch((err) => {
-          console.error(err);
-          statusText.innerText = '❌ Upload failed. Please try again.';
+        statusText.innerText = '⬆️ Uploading to Firebase...';
+
+        ref.put(audioFile).then(snapshot => {
+          return snapshot.ref.getDownloadURL();
+        }).then(downloadURL => {
+          statusText.innerText = '✅ Uploaded!';
+          urlOutput.innerHTML = `File URL: <a href="${downloadURL}" target="_blank">${downloadURL}</a>`;
+          console.log('Download URL:', downloadURL);
+        }).catch(error => {
+          console.error('Upload error:', error);
+          statusText.innerText = '❌ Upload failed.';
         });
 
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
       }).catch(console.error);
     };
   </script>
