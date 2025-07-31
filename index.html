@@ -5,17 +5,32 @@
   <title>Voice Recorder</title>
   <script src="https://cdn.jsdelivr.net/npm/mic-recorder-to-mp3@2.2.0/dist/index.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 40px; text-align: center; }
-    button { margin: 10px; padding: 10px 20px; font-size: 18px; }
-    audio { margin-top: 20px; }
+    body {
+      font-family: sans-serif;
+      padding: 40px;
+      text-align: center;
+    }
+    button {
+      margin: 10px;
+      padding: 10px 20px;
+      font-size: 18px;
+    }
+    audio {
+      margin-top: 20px;
+    }
+    #status {
+      margin-top: 20px;
+      font-weight: bold;
+      color: #444;
+    }
   </style>
 </head>
 <body>
   <h2>🎙️ Record Your Voice</h2>
   <button id="start">Start Recording</button>
-  <button id="stop" disabled>Stop & Save</button>
+  <button id="stop" disabled>Stop & Send</button>
   <audio id="player" controls></audio>
-  <p id="status"></p>
+  <p id="status">Tap start to begin</p>
 
   <script>
     const recorder = new MicRecorder({ bitRate: 128 });
@@ -24,31 +39,41 @@
     const audioPlayer = document.getElementById('player');
     const statusText = document.getElementById('status');
 
+    let audioFile = null;
+
     startBtn.onclick = () => {
       recorder.start().then(() => {
         startBtn.disabled = true;
         stopBtn.disabled = false;
-        statusText.innerText = 'Recording...';
+        statusText.innerText = '🎤 Recording...';
       }).catch(console.error);
     };
 
     stopBtn.onclick = () => {
       recorder.stop().getMp3().then(([buffer, blob]) => {
-        const file = new File(buffer, 'voice.mp3', { type: blob.type });
-        const url = URL.createObjectURL(file);
+        audioFile = new File(buffer, 'voice.mp3', { type: blob.type });
+        const url = URL.createObjectURL(audioFile);
         audioPlayer.src = url;
-        statusText.innerText = 'Recording complete. You can now play or download.';
-
-        // 🚀 OPTIONAL: Send to webhook
-        // const formData = new FormData();
-        // formData.append('audio', file);
-        // fetch('https://your-make-webhook-url', {
-        //   method: 'POST',
-        //   body: formData,
-        // });
-
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        statusText.innerText = 'Uploading audio...';
+
+        // ✅ Send to Make webhook
+        const formData = new FormData();
+        formData.append('audio', audioFile);
+
+        fetch('https://hook.eu2.make.com/svoue3j76cre2lbk5uvfd0kmme58a37f', {
+          method: 'POST',
+          body: formData,
+        })
+        .then(() => {
+          statusText.innerText = '✅ Audio sent to AI. You’ll receive a reply soon.';
+        })
+        .catch((err) => {
+          console.error(err);
+          statusText.innerText = '❌ Upload failed. Please try again.';
+        });
+
       }).catch(console.error);
     };
   </script>
