@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Voice Recorder to Firebase</title>
+  <title>Voice Recorder to AI</title>
   <script src="https://cdn.jsdelivr.net/npm/mic-recorder-to-mp3@2.2.0/dist/index.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-storage-compat.js"></script>
@@ -25,15 +25,15 @@
       font-weight: bold;
     }
     #urlOutput {
-      word-break: break-all;
+      word-break: break-word;
       font-size: 14px;
     }
   </style>
 </head>
 <body>
-  <h2>🎙️ Record & Upload to Firebase</h2>
+  <h2>🎙️ Record & Send to AI</h2>
   <button id="start">Start Recording</button>
-  <button id="stop" disabled>Stop & Upload</button>
+  <button id="stop" disabled>Stop & Send</button>
   <audio id="player" controls></audio>
   <p id="status">Ready to record.</p>
   <p id="urlOutput"></p>
@@ -73,8 +73,8 @@
     stopBtn.onclick = () => {
       recorder.stop().getMp3().then(([buffer, blob]) => {
         audioFile = new File(buffer, 'voice.mp3', { type: blob.type });
-        const url = URL.createObjectURL(audioFile);
-        audioPlayer.src = url;
+        const localUrl = URL.createObjectURL(audioFile);
+        audioPlayer.src = localUrl;
 
         const timestamp = Date.now();
         const filePath = `recordings/voice-${timestamp}.mp3`;
@@ -85,9 +85,26 @@
         ref.put(audioFile).then(snapshot => {
           return snapshot.ref.getDownloadURL();
         }).then(downloadURL => {
-          statusText.innerText = '✅ Uploaded!';
+          statusText.innerText = '✅ Uploaded! Sending to AI...';
           urlOutput.innerHTML = `File URL: <a href="${downloadURL}" target="_blank">${downloadURL}</a>`;
-          console.log('Download URL:', downloadURL);
+
+          // 🔁 Send to Make webhook
+          fetch("https://hook.eu2.make.com/svoue3j76cre2lbk5uvfd0kmme58a37f", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              file_url: downloadURL,
+              source: "flutterflow-webview"
+            })
+          }).then(() => {
+            statusText.innerText = '🚀 Sent to AI pipeline!';
+          }).catch(err => {
+            console.error('Webhook error:', err);
+            statusText.innerText = '⚠️ Failed to send to AI.';
+          });
+
         }).catch(error => {
           console.error('Upload error:', error);
           statusText.innerText = '❌ Upload failed.';
